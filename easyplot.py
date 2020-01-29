@@ -2,7 +2,6 @@
 
 import sys
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import argparse
 import numpy as np
 import os
@@ -82,7 +81,8 @@ if __name__ == "__main__":
     argParser = argparse.ArgumentParser()
     argParser.add_argument("file_path", nargs=1, help="Path to file containing data for plotting.")
     argParser.add_argument("columns", nargs=1, help="Columns to parse and plot.")
-    argParser.add_argument("--xy", action="store_true", default=False, help="Plot as xy(z) plot if set. Requires two or three columns. Xyz is used with three columns.")
+    argParser.add_argument("--xyy", action="store_true", default=False, help="Plot as xy plot if set. Requires two or more columns. The first column is treated as x-axis, the rest as y-axes.")
+    argParser.add_argument("--xyxy", action="store_true", default=False, help="Plot as xy plot if set. Requires a factor of two columns. The columns are alternatingly treated as x-axis and y-axis.")
     argParser.add_argument("--dots", action="store_true", default=False, help="Plot as dots instead of lines.")
     argParser.add_argument("--eval", type=str, default="", metavar="expression", help="Expression which will be evaluated on each data point. Use __X__ as data variable. Numpy can be used as np. Example 'np.asin(__X__)*2'")
     argParser.add_argument("--delimiter", type=str, default=None, metavar="string", help="Delimiter used to separate data fields.")
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     function = args.eval
     delimiter = args.delimiter
 
-    data = [[] for _ in range(300)]
+    data = [[] for _ in range(700)]
     header = None
 
     with open(path) as f:
@@ -122,25 +122,42 @@ if __name__ == "__main__":
 
     print("Plotting")
     data = [x for x in data if x != []]
-    if args.xy:
+    if args.xyy:
         fig = plt.figure()
         nCols = len(columns)
-        if (nCols != 2) and (nCols != 3):
-            raise Exception("Must have 2 or 3 columns with --xy option.")
+        if nCols < 2:
+            raise Exception("Must have 2 or more columns with --xyy option.")
 
+        ax = fig.add_subplot(111)
+        legend = []
         xData = data[columns[0]]
-        yData = data[columns[1]]
-        if nCols == 2:
-            ax = fig.add_subplot(111)
+        for col in columns[1:]:
+            yData = data[col]
             ax.plot(xData, yData, plotStyle)
-        elif nCols == 3:
-            zData = data[columns[2]]
-            ax = fig.add_subplot(111, projection="3d")
-            ax.plot(xData, yData, zData, plotStyle)
-
+            if header is not None:
+                legend.append(header[col])
         if header is not None:
             ax.set_xlabel(header[columns[0]])
-            ax.set_ylabel(header[columns[1]])
+            plt.legend(legend)
+    elif args.xyxy:
+        fig = plt.figure()
+        nCols = len(columns)
+        if nCols % 2 != 0:
+            raise Exception("Must have a factor of 2 columns with --xyxy option.")
+
+        ax = fig.add_subplot(111)
+        legend = []
+        numPairs = nCols // 2
+        for ix in range(numPairs):
+            xIx = ix * 2
+            yIx = xIx + 1
+            xData = data[columns[xIx]]
+            yData = data[columns[yIx]]
+            ax.plot(xData, yData, plotStyle)
+            if header is not None:
+                legend.append(f"{header[columns[xIx]]} vs {header[columns[yIx]]}")
+        if header is not None:
+            plt.legend(legend)
     else:
         for ix in columns:
             plt.plot(data[ix], plotStyle)
