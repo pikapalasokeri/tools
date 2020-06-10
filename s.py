@@ -22,6 +22,8 @@ class Matcher:
 
         if inputArgs.replace is not None:
             self._replaceString = inputArgs.replace.strip("\"'")
+        elif inputArgs.query_replace is not None:
+            self._replaceString = inputArgs.query_replace.strip("\"'")
         else:
             self._replaceString = None
 
@@ -153,15 +155,17 @@ class FileSearcher:
         self._maxLineLength = 200
         self._ignoreCase = inputArgs.ignore_case
         self._printCallback = printCallback
-        self._replace = False
+        self._replace = 0
         if inputArgs.replace is not None:
-            self._replace = True
+            self._replace = 1
+        elif inputArgs.query_replace is not None:
+            self._replace = 2
 
     def searchFile(self, root, f):
         filePath = os.path.join(root, f)
 
         try:
-            with tempfile.NamedTemporaryFile(mode="w") if self._replace else none() as replacedFile:
+            with tempfile.NamedTemporaryFile(mode="w") if self._replace > 0 else none() as replacedFile:
                 lineNumber = 0
                 numMatchingLines = 0
                 for line in open(filePath, "r"):
@@ -179,9 +183,17 @@ class FileSearcher:
                         numMatchingLines += 1
 
                     if replacedString is not None:
+                        if self._replace == 2 and matches is not None:
+                            question = "Replace? (y/n)"
+                            answer = input(question).lower()
+                            while answer not in ["y", "n"]:
+                                answer = input(question).lower()
+                            if answer == "n":
+                                replacedString = line
+
                         replacedFile.write(replacedString)
 
-                if (self._replace
+                if (self._replace > 0
                     and numMatchingLines > 0):
                     replacedFile.seek(0) # Hacky workaround. Sometimes we were copying an empty file
                                          # I think due to replacedFile getting out of scope.
@@ -203,10 +215,12 @@ def getArguments():
     argumentParser.add_argument("-xe", "--exclude-extensions", type = str, default = "", help = "Extensions to exclude from search, comma separated list. Default empty.")
     argumentParser.add_argument("-xd", "--exclude-directories", type = str, default = "", help = "Directories to exclude from search, comma separated list. Default empty.")
     argumentParser.add_argument("-r", "--replace", type = str, default = None, help = "Replace matching strings with provided string. Only works with one search string.")
+    argumentParser.add_argument("--query-replace", type = str, default = None, help = "Query-replace matching strings with provided string. Only works with one search string.")
     return argumentParser.parse_args()
 
 def verifyArguments(arguments):
-    if (arguments.replace is not None
+    if (((arguments.replace is not None) or
+         (arguments.query_replace is not None))
         and len(arguments.search_strings) > 1):
         print("Must only have one search string when replacing.")
         sys.exit(1)
