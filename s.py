@@ -145,6 +145,17 @@ class Colorizer:
     def _matchColor(self, match):
         return Colors.BROWN + match + Colors.NO_COLOR
 
+
+class NopColorizer:
+    def __init__(self):
+        pass
+
+    def colorize(self, root, fileName, lineNumber, line, matches):
+        return [os.path.join(root, fileName),
+                str(lineNumber) + ":",
+                line.rstrip()]
+
+
 @contextlib.contextmanager
 def none():
     yield None
@@ -233,7 +244,10 @@ else:
     verifyArguments(inputArgs)
 
     matcher = Matcher(inputArgs)
-    colorizer = Colorizer()
+    if os.fstat(0) == os.fstat(1): # https://stackoverflow.com/a/1512526
+        colorizer = Colorizer()
+    else:
+        colorizer = NopColorizer()
     printer = Printer(colorizer)
     fileChecker = FileSearcher(inputArgs, matcher.matchString, printer.print)
     walker = Walker(inputArgs, fileChecker.searchFile)
